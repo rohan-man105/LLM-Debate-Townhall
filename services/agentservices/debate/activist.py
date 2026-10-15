@@ -7,7 +7,7 @@ from services.tools.tavily import web_search,activist_search
 def socio():
     
     activist = Agent(
-        name="Activist",
+        name="Social Activist",
         instructions=INSTRUCTIONS_SOCIO,
         model=open_model,
         tools=[web_search,activist_search],

@@ -1,10 +1,11 @@
 import asyncio
 from services.tools.streaming import stream_agent
 from services.agentservices.debate.economist import eco
-from services.agentservices.debate.evironmentalist import enviro
+from services.agentservices.debate.environmentalist import enviro
 from services.agentservices.debate.activist import socio
 from services.agentservices.orchestrator import orch
 from services.agentservices.judge import JudgeVerdict,eval
+from services.agentservices.prompt import INSTRUCTIONS_ORCH
 from agents import Runner
 
 eco_agent = eco()
@@ -23,36 +24,37 @@ def build_transcript(topic, all_rounds):
     return "\n\n".join(lines)
 
 
-def build_briefing(topic, agent_name, round_num, total_rounds, transcript):
+async def build_briefing_with_orchestrator(topic, agent_name, round_num, total_rounds, transcript):
+
+    prompt = f"""
+    Create the debate briefing for this agent.
     
-    if round_num == 1:
-        round_type = "OPENING STANCE"
-        instructions = "Present your opening position backed by data..."
-    elif round_num == total_rounds:
-        round_type = "FINAL DEFENCE & CLOSING"
-        instructions = "Deliver your closing argument, address the strongest critique against you..."
-    else:
-        round_type = "CRITIQUE & REBUTTAL"
-        instructions = "Critique the other agents' arguments, defend against attacks on yours..."
+    Agent: {agent_name}
+    Debate topic: {topic}
+    Round: {round_num}
+    Total rounds: {total_rounds}
     
-    briefing = f"""
-DEBATE TOPIC: {topic}
-
-ROUND {round_num} OF {total_rounds} — {round_type}
-
-INSTRUCTIONS FOR THIS ROUND:
-{instructions}
-
-FULL DEBATE TRANSCRIPT SO FAR:
-{transcript if transcript else "No previous rounds — this is the opening round."}
-"""
-    return briefing
+    Transcript so far:
+    {transcript if transcript else "No previous rounds. This is the opening round."}
+    
+    Return only the briefing that should be sent to the agent.
+    """
+    
+    result = await Runner.run(orch_agent, prompt)
+    return result.final_output
+  
 
 
 async def run_round(agents, topic, round_num, total_rounds, transcript):
     results = {}
     for name, agent in agents.items():
-        briefing = build_briefing(topic, name, round_num, total_rounds, transcript)
+        briefing = await build_briefing_with_orchestrator(
+            topic,
+            name,
+            round_num,
+            total_rounds,
+            transcript
+        )
         print(f"\n{name} —\n")
         response = await stream_agent(agent, briefing)
         results[name] = response
